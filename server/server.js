@@ -14,20 +14,25 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// ── CORS: allow local dev + Vercel frontend + any custom domain ──────────
+// ── CORS: allow local dev + all Vercel previews + custom CLIENT_URL ──────
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  process.env.CLIENT_URL,        // e.g. https://your-app.vercel.app
+  process.env.CLIENT_URL,
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile, Postman) or from allowed origins
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+    // Allow: no origin (Postman/mobile), localhost, vercel.app domains, CLIENT_URL
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      process.env.NODE_ENV !== 'production'
+    ) {
       callback(null, true);
     } else {
-      callback(new Error(`CORS: Origin ${origin} not allowed`));
+      callback(new Error(`CORS blocked: ${origin}`));
     }
   },
   credentials: true
@@ -36,7 +41,13 @@ app.use(cors({
 // Setup Socket.io with CORS
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error(`Socket CORS blocked: ${origin}`));
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   }
