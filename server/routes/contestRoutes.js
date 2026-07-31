@@ -14,9 +14,10 @@ const { adminOnly } = require('../middleware/adminMiddleware');
 router.get('/status', protect, getContestStatus);
 router.put('/update', protect, adminOnly, updateContestState);
 
-router.put('/start', protect, adminOnly, startContest);
-router.put('/pause', protect, adminOnly, pauseContest);
-router.put('/resume', protect, adminOnly, resumeContest);
-router.put('/end', protect, adminOnly, endContest);
+// NOTE: frontend (AdminPanelPage.jsx) calls these with API.post(...), not PUT.
+router.post('/start', protect, adminOnly, startContest);
+router.post('/pause', protect, adminOnly, pauseContest);
+router.post('/resume', protect, adminOnly, resumeContest);
+router.post('/end', protect, adminOnly, endContest);
 
 module.exports = router;
