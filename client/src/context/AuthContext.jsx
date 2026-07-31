@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (token) {
         try {
           const res = await API.get('/auth/me');
@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
           joinContestRoom(res.data.user);
         } catch (err) {
           console.error('Session expired:', err.message);
-          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
           setUser(null);
         }
       }
@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const res = await API.post('/auth/login', { email, password });
-      localStorage.setItem('token', res.data.token);
+      sessionStorage.setItem('token', res.data.token);
       setUser(res.data.user);
       joinContestRoom(res.data.user);
       toast.success(`Welcome back, ${res.data.user.username}!`);
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (username, email, password, role, collegeOrOrg) => {
     try {
       const res = await API.post('/auth/register', { username, email, password, role, collegeOrOrg });
-      localStorage.setItem('token', res.data.token);
+      sessionStorage.setItem('token', res.data.token);
       setUser(res.data.user);
       joinContestRoom(res.data.user);
       toast.success('Registration successful! Welcome to CODE DEBUGGING.');
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setUser(null);
     toast.success('Logged out successfully.');
   };
