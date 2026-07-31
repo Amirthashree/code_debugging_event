@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: code-debugging-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false          # Set this in Render dashboard
+      - key: JWT_SECRET
+        sync: false          # Set this in Render dashboard
+      - key: ADMIN_EMAIL
+        value: admin@devdynasty.com
+      - key: ADMIN_PASSWORD
+        sync: false          # Set a strong password in Render dashboard
+      - key: CLIENT_URL
+        sync: false          # Set to your Vercel URL e.g. https://code-debugging.vercel.app
+    healthCheckPath: /api/health
