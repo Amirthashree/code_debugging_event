@@ -14,6 +14,13 @@ let memoryContest = {
   ]
 };
 
+// Helper: strip the placeholder string _id so Mongo/Mongoose can generate
+// a real ObjectId instead of throwing a CastError on the first seed.
+const stripId = (obj) => {
+  const { _id, ...rest } = obj;
+  return rest;
+};
+
 /**
  * @route GET /api/contest/status
  */
@@ -22,7 +29,7 @@ const getContestStatus = async (req, res) => {
     if (!getIsMockMode()) {
       let contest = await Contest.findOne();
       if (!contest) {
-        contest = await Contest.create(memoryContest);
+        contest = await Contest.create(stripId(memoryContest));
       }
       return res.json(contest);
     } else {
@@ -39,11 +46,10 @@ const getContestStatus = async (req, res) => {
 const updateContestState = async (req, res) => {
   try {
     const { status, durationMinutes, maxViolationsAllowed, announcement } = req.body;
-    
+
     if (!getIsMockMode()) {
       let contest = await Contest.findOne();
-      if (!contest) contest = new Contest(memoryContest);
-
+      if (!contest) contest = new Contest(stripId(memoryContest));
       if (status) contest.status = status;
       if (durationMinutes) {
         contest.durationMinutes = durationMinutes;
@@ -53,15 +59,11 @@ const updateContestState = async (req, res) => {
       if (announcement) {
         contest.announcements.unshift({ message: announcement, timestamp: new Date() });
       }
-
       await contest.save();
-
-      // Broadcast via socket if IO instance exists on app
       const io = req.app.get('io');
       if (io) {
         io.emit('contest:status_changed', contest);
       }
-
       return res.json(contest);
     } else {
       if (status) memoryContest.status = status;
@@ -73,12 +75,10 @@ const updateContestState = async (req, res) => {
       if (announcement) {
         memoryContest.announcements.unshift({ message: announcement, timestamp: new Date() });
       }
-
       const io = req.app.get('io');
       if (io) {
         io.emit('contest:status_changed', memoryContest);
       }
-
       return res.json(memoryContest);
     }
   } catch (error) {
@@ -86,4 +86,77 @@ const updateContestState = async (req, res) => {
   }
 };
 
-module.exports = { getContestStatus, updateContestState, memoryContest };
+// ── Shared helper used by the four handlers below ────────────────────────
+// Applies a status change (and optional duration reset) in either DB or
+// mock mode, broadcasts the change over socket.io, and responds with the
+// updated contest document.
+const applyStatusChange = async (req, res, newStatus, { resetDuration = false } = {}) => {
+  try {
+    const { durationMinutes } = req.body || {};
+
+    if (!getIsMockMode()) {
+      let contest = await Contest.findOne();
+      if (!contest) contest = new Contest(stripId(memoryContest));
+
+      contest.status = newStatus;
+
+      if (resetDuration) {
+        const mins = durationMinutes || contest.durationMinutes || 60;
+        contest.durationMinutes = mins;
+        contest.startTime = new Date();
+        contest.endTime = new Date(Date.now() + mins * 60 * 1000);
+      }
+
+      await contest.save();
+      const io = req.app.get('io');
+      if (io) io.emit('contest:status_changed', contest);
+      return res.json(contest);
+    } else {
+      memoryContest.status = newStatus;
+
+      if (resetDuration) {
+        const mins = durationMinutes || memoryContest.durationMinutes || 60;
+        memoryContest.durationMinutes = mins;
+        memoryContest.startTime = new Date();
+        memoryContest.endTime = new Date(Date.now() + mins * 60 * 1000);
+      }
+
+      const io = req.app.get('io');
+      if (io) io.emit('contest:status_changed', memoryContest);
+      return res.json(memoryContest);
+    }
+  } catch (error) {
+    res.status(500).json({ message: `Error setting contest status to ${newStatus}` });
+  }
+};
+
+/**
+ * @route PUT /api/contest/start (Admin)
+ * Starts (or restarts) the contest — resets startTime/endTime from durationMinutes.
+ */
+const startContest = (req, res) => applyStatusChange(req, res, 'active', { resetDuration: true });
+
+/**
+ * @route PUT /api/contest/pause (Admin)
+ */
+const pauseContest = (req, res) => applyStatusChange(req, res, 'paused');
+
+/**
+ * @route PUT /api/contest/resume (Admin)
+ */
+const resumeContest = (req, res) => applyStatusChange(req, res, 'active');
+
+/**
+ * @route PUT /api/contest/end (Admin)
+ */
+const endContest = (req, res) => applyStatusChange(req, res, 'ended');
+
+module.exports = {
+  getContestStatus,
+  updateContestState,
+  startContest,
+  pauseContest,
+  resumeContest,
+  endContest,
+  memoryContest
+};
