@@ -114,15 +114,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ── Serve React frontend in production ───────────────────────────────────
-// When backend and frontend are deployed together (e.g. single Render service)
-if (process.env.NODE_ENV === 'production') {
-  const clientBuildPath = path.join(__dirname, '../client/dist');
-  app.use(express.static(clientBuildPath));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientBuildPath, 'index.html'));
-  });
-}
+// ── Root route (API-only service — frontend is deployed separately on Vercel) ──
+app.get('/', (req, res) => {
+  res.json({ message: 'CODE DEBUGGING API is running', health: '/api/health' });
+});
+
+// Catch-all for unknown routes
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found' });
+});
 
 // Global Error Handler
 app.use(errorHandler);
